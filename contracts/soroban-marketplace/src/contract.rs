@@ -4,10 +4,12 @@
 
 #[allow(unused_imports)]
 use soroban_sdk::{
-    contract, contractimpl, log, panic_with_error,
+    contract, contractimpl, panic_with_error,
     token::Client as TokenClient,
     Address, Bytes, Env, Symbol, Vec,
 };
+
+use crate::events::*;
 
 use crate::{
     storage::{
@@ -50,6 +52,9 @@ impl MarketplaceContract {
 
         let listing_id = increment_listing_count(&env);
 
+        let currency_cloned = currency.clone();
+        let metadata_cid_cloned = metadata_cid.clone();
+
         let listing = Listing {
             listing_id,
             artist: artist.clone(),
@@ -64,7 +69,14 @@ impl MarketplaceContract {
         save_listing(&env, &listing);
         add_artist_listing_id(&env, &artist, listing_id);
 
-        log!(&env, "Listing created: id={}, artist={}", listing_id, artist);
+        ListingCreatedEvent {
+            listing_id,
+            artist: artist.clone(),
+            price,
+            currency: currency_cloned,
+            metadata_cid: metadata_cid_cloned,
+            ledger_sequence: env.ledger().sequence(),
+        }.publish(&env);
 
         listing_id
     }
@@ -106,13 +118,15 @@ impl MarketplaceContract {
         listing.owner = Some(buyer.clone());
         save_listing(&env, &listing);
 
-        log!(
-            &env,
-            "Artwork sold: listing_id={}, buyer={}, price={}",
+
+        ArtworkSoldEvent {
             listing_id,
-            buyer,
-            listing.price
-        );
+            artist: listing.artist.clone(),
+            buyer: buyer.clone(),
+            price: listing.price,
+            currency: listing.currency.clone(),
+            ledger_sequence: env.ledger().sequence(),
+        }.publish(&env);
 
         true
     }
@@ -135,7 +149,11 @@ impl MarketplaceContract {
         listing.status = ListingStatus::Cancelled;
         save_listing(&env, &listing);
 
-        log!(&env, "Listing cancelled: id={}", listing_id);
+        ListingCancelledEvent {
+            listing_id,
+            artist: artist.clone(),
+            ledger_sequence: env.ledger().sequence(),
+        }.publish(&env);
         true
     }
 

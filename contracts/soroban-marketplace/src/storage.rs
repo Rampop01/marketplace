@@ -1,3 +1,34 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::{testutils::{Address as _, Events}, Env, Address, bytes, symbol_short};
+    use crate::{MarketplaceContract, MarketplaceContractClient};
+
+    #[test]
+    fn test_create_listing_success() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        // Register the contract and get a client
+        let contract_id = env.register(MarketplaceContract, ());
+        let client = MarketplaceContractClient::new(&env, &contract_id);
+
+        let artist = Address::generate(&env);
+        let cid = bytes!(&env, 0x516d546573744349444f6e495046533132333435);
+        let price: i128 = 10_000_000;
+
+        let listing_id = client.create_listing(
+            &artist,
+            &cid,
+            &price,
+            &symbol_short!("XLM"),
+        );
+
+        assert_eq!(listing_id, 1u64);
+    // Events are now visible on the original env
+    let _events = env.events().all();
+    }
+}
 // ------------------------------------------------------------
 // storage.rs — Ledger storage key helpers
 // ------------------------------------------------------------

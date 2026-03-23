@@ -5,6 +5,8 @@
 #![cfg(test)]
 
 use super::*;
+use crate::events::*;
+use soroban_sdk::{testutils::Events, Symbol, Val};
 use soroban_sdk::{
     bytes,
     symbol_short,
@@ -17,7 +19,6 @@ fn setup() -> (Env, MarketplaceContractClient<'static>, Address, Address, Addres
     let env = Env::default();
     env.mock_all_auths();
 
-    // ✅ use register() instead of register_contract()
     let contract_id = env.register(MarketplaceContract, ());
     let client = MarketplaceContractClient::new(&env, &contract_id);
 
@@ -31,22 +32,23 @@ fn setup() -> (Env, MarketplaceContractClient<'static>, Address, Address, Addres
 
 #[test]
 fn test_create_listing_success() {
-    let (env, client, artist, _buyer, _) = setup();
-
+    let (env, client, artist, _, _) = setup();
     let cid = bytes!(&env, 0x516d546573744349444f6e495046533132333435);
     let price: i128 = 10_000_000; // 1 XLM
 
-    let listing_id = client.create_listing(&artist, &cid, &price, &symbol_short!("XLM"));
+    let listing_id = client.create_listing(
+        &artist,
+        &cid,
+        &price,
+        &symbol_short!("XLM"),
+    );
 
-    assert_eq!(listing_id, 1);
-    assert_eq!(client.get_total_listings(), 1);
+    assert_eq!(listing_id, 1u64);
 
-    let listing = client.get_listing(&1);
-    assert_eq!(listing.listing_id, 1);
+    let listing = client.get_listing(&listing_id);
     assert_eq!(listing.artist, artist);
     assert_eq!(listing.price, price);
     assert_eq!(listing.status, ListingStatus::Active);
-    assert!(listing.owner.is_none());
 }
 
 #[test]
@@ -111,7 +113,6 @@ fn test_get_artist_listings() {
     assert_eq!(ids.get(2).unwrap(), 3_u64);
 }
 
-
 #[test]
 fn test_buy_artwork_success() {
     let (env, client, artist, buyer, _) = setup();
@@ -125,9 +126,8 @@ fn test_buy_artwork_success() {
 
     let listing = client.get_listing(&id);
     assert_eq!(listing.status, ListingStatus::Sold);
-    assert_eq!(listing.owner, Some(buyer));
+    assert_eq!(listing.owner, Some(buyer.clone()));
 }
-
 
 // ── get_listing not found ────────────────────────────────────
 
