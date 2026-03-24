@@ -1,8 +1,8 @@
+#![no_std]
+pub mod events;
 // ------------------------------------------------------------
 // lib.rs — Soroban Marketplace contract root
 // ------------------------------------------------------------
-
-#![no_std]
 
 mod contract;
 mod storage;

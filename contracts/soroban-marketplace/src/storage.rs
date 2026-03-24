@@ -1,3 +1,49 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{MarketplaceContract, MarketplaceContractClient};
+    use soroban_sdk::{
+        bytes, symbol_short,
+        testutils::{Address as _, Events},
+        Address, Env,
+    };
+
+    #[test]
+    fn test_create_listing_success() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        // Register the contract and get a client
+        let contract_id = env.register(MarketplaceContract, ());
+        let client = MarketplaceContractClient::new(&env, &contract_id);
+
+        let artist = Address::generate(&env);
+        let cid = bytes!(&env, 0x516d546573744349444f6e495046533132333435);
+        let price: i128 = 10_000_000;
+
+        client.set_admin(&artist);
+        client.add_token_to_whitelist(&contract_id);
+        let listing_id = client.create_listing(
+            &artist,
+            &cid,
+            &price,
+            &symbol_short!("XLM"),
+            &contract_id,
+            &0u32,
+            &soroban_sdk::vec![
+                &env,
+                crate::types::Recipient {
+                    address: artist.clone(),
+                    percentage: 100,
+                }
+            ],
+        );
+
+        assert_eq!(listing_id, 1u64);
+        // Events are now visible on the original env
+        let _events = env.events().all();
+    }
+}
 // ------------------------------------------------------------
 // storage.rs — Ledger storage key helpers
 // ------------------------------------------------------------
@@ -17,6 +63,9 @@ use soroban_sdk::{contracttype, Address, Env, Vec};
 
 use crate::types::Listing;
 
+/// Storage key for the admin address
+pub const ADMIN_KEY: &str = "admin";
+
 /// Storage key variants for the marketplace contract.
 #[contracttype]
 #[derive(Clone)]
@@ -27,6 +76,14 @@ pub enum DataKey {
     Listing(u64),
     /// Stores a `Vec<u64>` of listing IDs owned by an artist.
     ArtistListings(Address),
+    /// Stores the admin address
+    Admin,
+    /// Stores the token whitelist as a Vec<Address>
+    TokenWhitelist,
+    /// Stores the treasury address
+    Treasury,
+    /// Stores the protocol fee in basis points
+    ProtocolFeeBps, // fee in basis points (1/100 of a percent)
 }
 
 // ── Bump amounts (ledger sequences) ─────────────────────────
@@ -96,4 +153,24 @@ pub fn add_artist_listing_id(env: &Env, artist: &Address, listing_id: u64) {
     env.storage()
         .persistent()
         .extend_ttl(&key, LEDGER_TTL_THRESHOLD, LEDGER_TTL_BUMP);
+}
+
+// ── Protocol fee and treasury storage ─────────────────────
+
+pub fn set_treasury_storage(env: &Env, addr: &Address) {
+    env.storage().persistent().set(&DataKey::Treasury, addr);
+}
+
+pub fn get_treasury_storage(env: &Env) -> Option<Address> {
+    env.storage().persistent().get(&DataKey::Treasury)
+}
+
+pub fn set_protocol_fee_bps_storage(env: &Env, bps: u32) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::ProtocolFeeBps, &bps);
+}
+
+pub fn get_protocol_fee_bps_storage(env: &Env) -> Option<u32> {
+    env.storage().persistent().get(&DataKey::ProtocolFeeBps)
 }
