@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useWalletContext } from "@/context/WalletContext";
-import { Wallet, Store, LayoutDashboard, Menu, X, AlertTriangle, LogOut, ShieldCheck } from "lucide-react";
+import { Wallet, Store, LayoutDashboard, Menu, X, AlertTriangle, LogOut, ShieldCheck, User } from "lucide-react";
 import { ConnectWalletModal } from "./ConnectWalletModal";
 
 export function Navbar() {
@@ -60,15 +60,25 @@ export function Navbar() {
               Marketplace
             </Link>
             {isConnected && (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1.5 text-white/70 hover:text-brand-400 transition-colors duration-300"
-              >
-                <LayoutDashboard size={16} />
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-1.5 text-white/70 hover:text-brand-400 transition-colors duration-300"
+                >
+                  <LayoutDashboard size={16} />
+                  Dashboard
+                </Link>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-1.5 text-white/70 hover:text-mint-400 transition-colors duration-300"
+                >
+                  <User size={16} />
+                  My Profile
+                </Link>
+              </>
             )}
           </div>
+
 
           {/* Desktop wallet button */}
           <div className="hidden md:flex items-center gap-4">
@@ -139,14 +149,24 @@ export function Navbar() {
                 Marketplace
               </Link>
               {isConnected && (
-                <Link
-                  href="/dashboard"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-3 text-white/80 hover:text-brand-400 transition-colors text-lg font-display"
-                >
-                  <LayoutDashboard size={20} className="text-brand-500" />
-                  Dashboard
-                </Link>
+                <>
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 text-white/80 hover:text-brand-400 transition-colors text-lg font-display"
+                  >
+                    <LayoutDashboard size={20} className="text-brand-500" />
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 text-white/80 hover:text-mint-400 transition-colors text-lg font-display"
+                  >
+                    <User size={20} className="text-mint-400" />
+                    My Profile
+                  </Link>
+                </>
               )}
             </div>
 
