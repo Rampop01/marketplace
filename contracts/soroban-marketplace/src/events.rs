@@ -187,4 +187,28 @@ impl OfferWithdrawnEvent {
     }
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArtistRevokedEvent {
+    pub artist: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArtistReinstatedEvent {
+    pub artist: Address,
+}
+
+impl ArtistRevokedEvent {
+    pub fn publish(self, env: &Env) {
+        env.events().publish((ARTIST_REVOKED,), self);
+    }
+}
+
+impl ArtistReinstatedEvent {
+    pub fn publish(self, env: &Env) {
+        env.events().publish((ARTIST_REINSTATED,), self);
+    }
+}
+
 // End of events

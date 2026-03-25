@@ -88,7 +88,7 @@ export interface CreateListingInput {
   description: string;
   artistName: string;
   year: string;
-  priceXlm: number;
+  price: number;
   tokenAddress?: string;
   royaltyBps?: number;
   imageFile: File;
@@ -132,7 +132,7 @@ export function useCreateListing(artistPublicKey: string | null) {
         const listingId = await createListing(
           artistPublicKey,
           metadataResult.cid,
-          input.priceXlm,
+          input.price,
           input.tokenAddress,
           input.royaltyBps
         );
@@ -220,7 +220,7 @@ export interface UpdateListingInput {
   description: string;
   artistName: string;
   year: string;
-  priceXlm: number;
+  price: number;
   tokenAddress: string;
   imageFile?: File; // Optional: only if updating the image
   currentMetadata: ArtworkMetadata;
@@ -270,7 +270,7 @@ export function useUpdateListing(artistPublicKey: string | null) {
           artistPublicKey,
           input.listingId,
           metadataResult.cid,
-          input.priceXlm,
+          input.price,
           input.tokenAddress
         );
 

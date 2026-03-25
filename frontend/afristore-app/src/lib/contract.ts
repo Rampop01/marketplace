@@ -205,12 +205,12 @@ function parseAuctionFromScVal(raw: unknown): Auction {
 export async function createListing(
   artistPublicKey: string,
   metadataCid: string,
-  priceXlm: number,
+  price: number,
   tokenAddress: string = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC", // Default to XLM
   royaltyBps: number = 0,
   recipients: Array<{ address: string; percentage: number }> = []
 ): Promise<number> {
-  const priceStroops = BigInt(Math.round(priceXlm * 10_000_000));
+  const priceStroops = BigInt(Math.round(price * 10_000_000));
 
   // If no recipients provided, default to 100% to the artist
   const finalRecipients = recipients.length > 0 
@@ -273,10 +273,11 @@ export async function updateListing(
   artistPublicKey: string,
   listingId: number,
   newMetadataCid: string,
-  newPriceXlm: number,
-  newTokenAddress: string
+  newPrice: number,
+  newTokenAddress: string,
+  newRecipients: Array<{ address: string; percentage: number }> = []
 ): Promise<boolean> {
-  const priceStroops = BigInt(Math.round(newPriceXlm * 10_000_000));
+  const priceStroops = BigInt(Math.round(newPrice * 10_000_000));
 
   const args: xdr.ScVal[] = [
     new Address(artistPublicKey).toScVal(),
@@ -284,6 +285,10 @@ export async function updateListing(
     nativeToScVal(Buffer.from(newMetadataCid, "utf-8"), { type: "bytes" }),
     nativeToScVal(priceStroops, { type: "i128" }),
     new Address(newTokenAddress).toScVal(),
+    nativeToScVal(newRecipients.map(r => ({
+        address: new Address(r.address),
+        percentage: r.percentage
+    })), { type: "vec" }),
   ];
 
   await invokeContract(artistPublicKey, "update_listing", args);
