@@ -1,12 +1,12 @@
 //! LazyMint1155 — Lazy-minting ERC-1155-equivalent on Soroban.
 //!
 //! Voucher model is the same as LazyMint721 but vouchers carry a
-//! `max_amount` and `price_per_unit`. A buyer can call `redeem` multiple
+//! `buyer_quota` and `price_per_unit`. A buyer can call `redeem` multiple
 //! times for the same token_id as long as their cumulative amount stays ≤
-//! `max_amount`.  This mirrors edition-based lazy drops.
+//! `buyer_quota`.  This mirrors edition-based lazy drops.
 //!
 //! Signed digest:
-//!   sha256(token_id ‖ max_amount ‖ price_per_unit ‖ valid_until ‖ uri_hash ‖ currency_xdr)
+//!   sha256(token_id ‖ buyer_quota ‖ price_per_unit ‖ valid_until ‖ uri_hash ‖ currency_xdr)
 #![no_std]
 
 use soroban_sdk::{
@@ -28,8 +28,11 @@ pub enum Error {
     InsufficientBalance      = 4,
     LengthMismatch           = 5,
     VoucherExpired           = 6,
-    ExceedsVoucherMax        = 7,  // cumulative amount > voucher.max_amount
+    ExceedsVoucherMax        = 7,  // cumulative amount > voucher.buyer_quota
     NotCreator               = 8,
+    EditionNotRegistered     = 9,
+    EditionAlreadyRegistered = 10,
+    MaxSupplyReached         = 11,
 }
 
 // ─── Data types ───────────────────────────────────────────────────────────────
@@ -38,7 +41,7 @@ pub enum Error {
 #[derive(Clone)]
 pub struct MintVoucher1155 {
     pub token_id:       u64,
-    pub max_amount:     u128,   // total that can ever be minted for this token_id
+    pub buyer_quota:    u128,   // max per-buyer allocation (replaces max_amount)
     pub price_per_unit: i128,   // 0 = free
     pub currency:       Address,
     pub uri:            String,
@@ -60,7 +63,8 @@ pub enum DataKey {
     TokenUri(u64),
     TotalSupply(u64),
     MintedPerBuyer(Address, u64),     // (buyer, token_id) → u128 cumulative minted
-    MaxAmount(u64),                   // token_id → max_amount from voucher
+    MaxAmount(u64),                   // token_id → max_amount from voucher (legacy)
+    EditionMaxSupply(u64),            // token_id → global edition cap (#61)
 }
 
 // ─── Contract ─────────────────────────────────────────────────────────────────
@@ -98,7 +102,7 @@ impl LazyMint1155 {
     /// Buyer redeems a signed voucher for `amount` copies of `voucher.token_id`.
     ///
     /// The buyer can call this multiple times for the same voucher as long as
-    /// the running total stays ≤ `voucher.max_amount`.  Good for edition drops
+    /// the running total stays ≤ `voucher.buyer_quota`.  Good for edition drops
     /// where the creator wants to limit each buyer's share.
     pub fn redeem(
         env: Env,
@@ -116,20 +120,32 @@ impl LazyMint1155 {
             return Err(Error::VoucherExpired);
         }
 
-        // 2. Per-buyer quota check
-        let minted_key = DataKey::MintedPerBuyer(buyer.clone(), voucher.token_id);
-        let already: u128 = env.storage().persistent()
-            .get(&minted_key).unwrap_or(0);
-        if already + amount > voucher.max_amount {
-            return Err(Error::ExceedsVoucherMax);
+        // 2. Global supply check — edition must be registered (#61)
+        let edition_max: u128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::EditionMaxSupply(voucher.token_id))
+            .ok_or(Error::EditionNotRegistered)?;
+
+        let current_supply: u128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalSupply(voucher.token_id))
+            .unwrap_or(0);
+
+        if current_supply + amount > edition_max {
+            return Err(Error::MaxSupplyReached);
         }
 
-        // 3. Global max_amount consistency (first redemption sets it)
-        if !env.storage().persistent().has(&DataKey::MaxAmount(voucher.token_id)) {
-            env.storage().persistent()
-                .set(&DataKey::MaxAmount(voucher.token_id), &voucher.max_amount);
-            env.storage().persistent()
-                .extend_ttl(&DataKey::MaxAmount(voucher.token_id), 50_000, 100_000);
+        // 3. Per-buyer quota check
+        let minted_key = DataKey::MintedPerBuyer(buyer.clone(), voucher.token_id);
+        let already: u128 = env
+            .storage()
+            .persistent()
+            .get(&minted_key)
+            .unwrap_or(0);
+        if already + amount > voucher.buyer_quota {
+            return Err(Error::ExceedsVoucherMax);
         }
 
         // 4. Signature verification (panics tx on bad sig)
@@ -349,6 +365,38 @@ impl LazyMint1155 {
         Ok(())
     }
 
+    // ── Edition Management (#61) ──────────────────────────────────────────
+
+    /// Creator registers the global edition cap for a token_id before distributing vouchers.
+    pub fn register_edition(env: Env, token_id: u64, max_supply: u128) -> Result<(), Error> {
+        Self::extend_instance_ttl(&env);
+        Self::only_creator(&env)?;
+
+        let key = DataKey::EditionMaxSupply(token_id);
+        if env.storage().persistent().has(&key) {
+            return Err(Error::EditionAlreadyRegistered);
+        }
+
+        env.storage().persistent().set(&key, &max_supply);
+        env.storage().persistent().extend_ttl(&key, 50_000, 100_000);
+
+        env.events()
+            .publish((symbol_short!("register"), token_id), max_supply);
+        Ok(())
+    }
+
+    /// View: returns the global edition cap for a token_id (0 if not registered).
+    pub fn edition_max_supply(env: Env, token_id: u64) -> u128 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::EditionMaxSupply(token_id))
+            .unwrap_or(0)
+    }
+
+    fn extend_instance_ttl(env: &Env) {
+        env.storage().instance().extend_ttl(50_000, 100_000);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────
 
     fn only_creator(env: &Env) -> Result<Address, Error> {
@@ -359,11 +407,11 @@ impl LazyMint1155 {
         Ok(creator)
     }
 
-    /// sha256(token_id ‖ max_amount ‖ price_per_unit ‖ valid_until ‖ uri_hash ‖ currency_xdr)
+    /// sha256(token_id ‖ buyer_quota ‖ price_per_unit ‖ valid_until ‖ uri_hash ‖ currency_xdr)
     fn _voucher_digest(env: &Env, v: &MintVoucher1155) -> Bytes {
         let mut raw = Bytes::new(env);
         raw.extend_from_array(&v.token_id.to_be_bytes());
-        raw.extend_from_array(&v.max_amount.to_be_bytes());
+        raw.extend_from_array(&v.buyer_quota.to_be_bytes());
         raw.extend_from_array(&v.price_per_unit.to_be_bytes());
         raw.extend_from_array(&v.valid_until.to_be_bytes());
         raw.append(&v.uri_hash.clone().into());
@@ -403,3 +451,4 @@ impl LazyMint1155 {
             .unwrap_or(false)
     }
 }
+mod test;

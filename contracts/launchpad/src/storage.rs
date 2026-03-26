@@ -97,23 +97,62 @@ pub fn record_collection(env: &Env, creator: &Address, address: &Address, kind: 
         creator: creator.clone(),
     };
 
-
-    // Per-creator list
-    let mut by_creator = collections_by_creator(env, creator);
-    by_creator.push_back(rec.clone());
-    env.storage().persistent().set(&DataKey::ByCreator(creator.clone()), &by_creator);
+    // Global indexed storage (#51) — each record in its own key, no Vec bloat
+    let global_idx = collection_count(env);
     env.storage()
         .persistent()
-        .extend_ttl(&DataKey::ByCreator(creator.clone()), TTL_THRESHOLD, TTL_BUMP);
+        .set(&DataKey::CollectionByIndex(global_idx), &rec);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::CollectionByIndex(global_idx), TTL_THRESHOLD, TTL_BUMP);
 
+    // Per-creator indexed storage (#51) — same pattern per creator
+    let creator_count: u64 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::CreatorCollectionCount(creator.clone()))
+        .unwrap_or(0);
+    env.storage().persistent().set(
+        &DataKey::CreatorCollectionByIndex(creator.clone(), creator_count),
+        &rec,
+    );
+    env.storage().persistent().extend_ttl(
+        &DataKey::CreatorCollectionByIndex(creator.clone(), creator_count),
+        TTL_THRESHOLD,
+        TTL_BUMP,
+    );
+    env.storage().persistent().set(
+        &DataKey::CreatorCollectionCount(creator.clone()),
+        &(creator_count + 1),
+    );
 
-    // Global list
-    let mut all = all_collections(env);
-    all.push_back(rec);
-    env.storage().persistent().set(&DataKey::AllCollections, &all);
-    env.storage().persistent().extend_ttl(&DataKey::AllCollections, TTL_THRESHOLD, TTL_BUMP);
-
-
-    let next = collection_count(env) + 1;
+    // Increment global counter
+    let next = global_idx + 1;
     env.storage().instance().set(&DataKey::CollectionCount, &next);
+}
+
+/// Get a collection by global index.
+pub fn collection_by_index(env: &Env, index: u64) -> Option<CollectionRecord> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::CollectionByIndex(index))
+}
+
+/// Get per-creator collection count.
+pub fn creator_collection_count(env: &Env, creator: &Address) -> u64 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::CreatorCollectionCount(creator.clone()))
+        .unwrap_or(0)
+}
+
+/// Get a creator's collection by index.
+pub fn creator_collection_by_index(
+    env: &Env,
+    creator: &Address,
+    index: u64,
+) -> Option<CollectionRecord> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::CreatorCollectionByIndex(creator.clone(), index))
 }
