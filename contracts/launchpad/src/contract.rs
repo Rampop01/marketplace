@@ -157,14 +157,23 @@ impl Launchpad {
     pub fn deploy_normal_721(
         env: Env,
         creator: Address,
+        currency: Address, // [NEW] SAC address for fee payment
         name: String,
         symbol: String,
-        max_supply: u64,  // pass u64::MAX for unlimited
-        royalty_bps: u32,  // e.g. 500 = 5 %
+        max_supply: u64,
+        royalty_bps: u32,
         royalty_receiver: Address,
         salt: BytesN<32>,
     ) -> Result<Address, Error> {
         creator.require_auth();
+
+        // [FEE] Collect deployment fee (#54)
+        let (receiver, fee) = storage::get_platform_fee(&env);
+        if fee > 0 {
+            soroban_sdk::token::TokenClient::new(&env, &currency)
+                .transfer(&creator, &receiver, &(fee as i128));
+        }
+
         let wasm = storage::get_wasm_normal_721(&env).ok_or(Error::WasmHashNotSet)?;
 
         // Deploy a new contract instance that shares the Normal721 WASM
@@ -189,12 +198,21 @@ impl Launchpad {
     pub fn deploy_normal_1155(
         env: Env,
         creator: Address,
+        currency: Address,
         name: String,
         royalty_bps: u32,
         royalty_receiver: Address,
         salt: BytesN<32>,
     ) -> Result<Address, Error> {
         creator.require_auth();
+
+        // [FEE] Collect deployment fee (#54)
+        let (receiver, fee) = storage::get_platform_fee(&env);
+        if fee > 0 {
+            soroban_sdk::token::TokenClient::new(&env, &currency)
+                .transfer(&creator, &receiver, &(fee as i128));
+        }
+
         let wasm = storage::get_wasm_normal_1155(&env).ok_or(Error::WasmHashNotSet)?;
 
         let addr = env.deployer().with_current_contract(salt).deploy_v2(wasm, ());
@@ -215,6 +233,7 @@ impl Launchpad {
     pub fn deploy_lazy_721(
         env: Env,
         creator: Address,
+        currency: Address,
         creator_pubkey: BytesN<32>,
         name: String,
         symbol: String,
@@ -224,6 +243,14 @@ impl Launchpad {
         salt: BytesN<32>,
     ) -> Result<Address, Error> {
         creator.require_auth();
+
+        // [FEE] Collect deployment fee (#54)
+        let (receiver, fee) = storage::get_platform_fee(&env);
+        if fee > 0 {
+            soroban_sdk::token::TokenClient::new(&env, &currency)
+                .transfer(&creator, &receiver, &(fee as i128));
+        }
+
         let wasm = storage::get_wasm_lazy_721(&env).ok_or(Error::WasmHashNotSet)?;
 
         let addr = env.deployer().with_current_contract(salt).deploy_v2(wasm, ());
@@ -248,6 +275,7 @@ impl Launchpad {
     pub fn deploy_lazy_1155(
         env: Env,
         creator: Address,
+        currency: Address,
         creator_pubkey: BytesN<32>,
         name: String,
         royalty_bps: u32,
@@ -255,6 +283,14 @@ impl Launchpad {
         salt: BytesN<32>,
     ) -> Result<Address, Error> {
         creator.require_auth();
+
+        // [FEE] Collect deployment fee (#54)
+        let (receiver, fee) = storage::get_platform_fee(&env);
+        if fee > 0 {
+            soroban_sdk::token::TokenClient::new(&env, &currency)
+                .transfer(&creator, &receiver, &(fee as i128));
+        }
+
         let wasm = storage::get_wasm_lazy_1155(&env).ok_or(Error::WasmHashNotSet)?;
 
         let addr = env.deployer().with_current_contract(salt).deploy_v2(wasm, ());
