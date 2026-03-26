@@ -20,6 +20,7 @@ pub enum MarketplaceError {
     AuctionExpired = 12,
     AuctionNotExpired = 13,
     AuctionAlreadyFinalized = 14,
+    ArtistRevoked = 15,
 }
 
 #[contracttype]

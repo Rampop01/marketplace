@@ -87,6 +87,8 @@ pub enum DataKey {
     Auction(u64),
     /// Stores a `Vec<u64>` of auction IDs owned by an artist.
     ArtistAuctions(Address),
+    /// Stores the revocation status of an artist (bool)
+    RevokedArtist(Address),
 }
 
 // ── Bump amounts (ledger sequences) ─────────────────────────

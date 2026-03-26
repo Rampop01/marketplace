@@ -114,10 +114,48 @@ impl MarketplaceContract {
         admin.require_auth();
     }
 
-    /// Internal: get admin address
-    fn get_admin(env: &Env) -> Option<Address> {
+    /// Revoke an artist's ability to create new listings/auctions.
+    pub fn revoke_artist(env: Env, artist: Address) {
+        Self::require_admin(&env);
+        env.storage()
+            .persistent()
+            .set(&crate::storage::DataKey::RevokedArtist(artist.clone()), &true);
+        // Publish event
+        env.events().publish((crate::events::ARTIST_REVOKED,), artist);
+    }
+
+    /// Reinstate a revoked artist.
+    pub fn reinstate_artist(env: Env, artist: Address) {
+        Self::require_admin(&env);
+        env.storage()
+            .persistent()
+            .remove(&crate::storage::DataKey::RevokedArtist(artist.clone()));
+        // Publish event
+        env.events().publish((crate::events::ARTIST_REINSTATED,), artist);
+    }
+
+    /// Check if an artist is revoked.
+    pub fn is_artist_revoked(env: Env, artist: Address) -> bool {
+        env.storage()
+            .persistent()
+            .get::<_, bool>(&crate::storage::DataKey::RevokedArtist(artist))
+            .unwrap_or(false)
+    }
+
+    /// Get admin address
+    pub fn get_admin(env: Env) -> Option<Address> {
         let key = crate::storage::DataKey::Admin;
         env.storage().persistent().get::<_, Address>(&key)
+    }
+
+    /// Get treasury address
+    pub fn get_treasury(env: Env) -> Option<Address> {
+        crate::storage::get_treasury_storage(&env)
+    }
+
+    /// Get protocol fee (bps)
+    pub fn get_protocol_fee(env: Env) -> u32 {
+        crate::storage::get_protocol_fee_bps_storage(&env).unwrap_or(0)
     }
 
     /// Check if a token is whitelisted (returns true if whitelist is empty)
@@ -151,6 +189,9 @@ impl MarketplaceContract {
         recipients: Vec<Recipient>,
     ) -> u64 {
         artist.require_auth();
+        if Self::is_artist_revoked(env.clone(), artist.clone()) {
+            panic_with_error!(&env, MarketplaceError::ArtistRevoked);
+        }
         if metadata_cid.is_empty() {
             panic_with_error!(&env, MarketplaceError::InvalidCid);
         }
@@ -317,6 +358,9 @@ impl MarketplaceContract {
         recipients: Vec<Recipient>,
     ) -> u64 {
         creator.require_auth();
+        if Self::is_artist_revoked(env.clone(), creator.clone()) {
+            panic_with_error!(&env, MarketplaceError::ArtistRevoked);
+        }
         if metadata_cid.is_empty() {
             panic_with_error!(&env, MarketplaceError::InvalidCid);
         }
@@ -565,7 +609,6 @@ impl MarketplaceContract {
         get_listing_count(&env)
     }
 
-    // ── get_artist_listings ──────────────────────────────────
     /// Returns the Vec of listing IDs created by a given artist address.
     pub fn get_artist_listings(env: Env, artist: Address) -> Vec<u64> {
         get_artist_listing_ids(&env, &artist)

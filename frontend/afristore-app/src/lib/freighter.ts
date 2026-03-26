@@ -15,15 +15,12 @@ export interface FreighterAccount {
   networkPassphrase: string;
 }
 
-// ── Detect wallet ─────────────────────────────────────────────
-
 /**
  * Returns true if the Freighter extension is installed in this browser.
  */
 export async function isFreighterInstalled(): Promise<boolean> {
   try {
-    const connected = await isConnected();
-    return connected.isConnected;
+    return await isConnected();
   } catch {
     return false;
   }
@@ -37,22 +34,22 @@ export async function isFreighterInstalled(): Promise<boolean> {
  */
 export async function connectFreighter(): Promise<FreighterAccount> {
   const allowed = await setAllowed();
-  if (!allowed.isAllowed) {
+  if (!allowed) {
     throw new Error("Freighter access was denied by the user.");
   }
 
-  const keyResult = await getPublicKey();
-  if (keyResult.error) {
-    throw new Error(`Freighter key error: ${keyResult.error}`);
+  const publicKey = await getPublicKey();
+  if (!publicKey) {
+    throw new Error("Could not retrieve public key from Freighter.");
   }
 
   const networkResult = await getNetworkDetails();
-  if (networkResult.error) {
-    throw new Error(`Freighter network error: ${networkResult.error}`);
+  if (!networkResult) {
+    throw new Error("Could not retrieve network details from Freighter.");
   }
 
   return {
-    publicKey: keyResult.publicKey,
+    publicKey,
     networkPassphrase: networkResult.networkPassphrase,
   };
 }
@@ -67,11 +64,11 @@ export async function signWithFreighter(
   txXdr: string,
   networkPassphrase: string
 ): Promise<string> {
-  const result = await signTransaction(txXdr, { networkPassphrase });
-  if (result.error) {
-    throw new Error(`Freighter sign error: ${result.error}`);
+  const signedTxXdr = await signTransaction(txXdr, { networkPassphrase });
+  if (!signedTxXdr) {
+    throw new Error("Freighter sign error: result was empty.");
   }
-  return result.signedTxXdr;
+  return signedTxXdr;
 }
 
 // ── Get connected public key ──────────────────────────────────
@@ -82,9 +79,9 @@ export async function signWithFreighter(
 export async function getConnectedPublicKey(): Promise<string | null> {
   try {
     const connected = await isConnected();
-    if (!connected.isConnected) return null;
-    const keyResult = await getPublicKey();
-    return keyResult.error ? null : keyResult.publicKey;
+    if (!connected) return null;
+    const publicKey = await getPublicKey();
+    return publicKey || null;
   } catch {
     return null;
   }
