@@ -118,8 +118,25 @@ stellar contract invoke --id $LAUNCHPAD \
 | `NEXT_PUBLIC_STELLAR_NETWORK` | `testnet` or `mainnet` |
 | `NEXT_PUBLIC_STELLAR_RPC_URL` | Soroban RPC endpoint |
 | `NEXT_PUBLIC_STELLAR_HORIZON_URL` | Horizon API endpoint |
-| `NEXT_PUBLIC_PINATA_JWT` | Pinata JWT for IPFS uploads |
+| `PINATA_JWT` | Pinata JWT for server-side uploads (private) |
 | `NEXT_PUBLIC_PINATA_GATEWAY` | Pinata IPFS gateway URL |
+
+### Which env vars are for Vercel frontend
+
+Only the frontend app in `frontend/afristore-app` needs these in Vercel:
+
+- Public vars (`NEXT_PUBLIC_*`):
+  - `NEXT_PUBLIC_CONTRACT_ID`
+  - `NEXT_PUBLIC_STELLAR_NETWORK`
+  - `NEXT_PUBLIC_STELLAR_RPC_URL`
+  - `NEXT_PUBLIC_STELLAR_HORIZON_URL`
+  - `NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE`
+  - `NEXT_PUBLIC_PINATA_GATEWAY`
+  - `NEXT_PUBLIC_INDEXER_URL` (if using indexer endpoints)
+- Private server vars:
+  - `PINATA_JWT`
+
+The indexer and deploy scripts use their own env files and do not need to be set in Vercel for frontend preview deployments.
 
 ## Tech Stack
 

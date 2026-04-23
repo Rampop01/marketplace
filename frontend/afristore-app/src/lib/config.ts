@@ -14,7 +14,6 @@ export const config = {
   networkPassphrase:
     process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE ??
     "Test SDF Network ; September 2015",
-  pinataJwt: process.env.NEXT_PUBLIC_PINATA_JWT ?? "",
   pinataGateway:
     process.env.NEXT_PUBLIC_PINATA_GATEWAY ?? "https://gateway.pinata.cloud",
 } as const;
@@ -22,7 +21,6 @@ export const config = {
 export function assertConfig() {
   const missing: string[] = [];
   if (!config.contractId) missing.push("NEXT_PUBLIC_CONTRACT_ID");
-  if (!config.pinataJwt) missing.push("NEXT_PUBLIC_PINATA_JWT");
   if (missing.length > 0) {
     console.warn(
       `[Afristore] Missing environment variables: ${missing.join(", ")}`

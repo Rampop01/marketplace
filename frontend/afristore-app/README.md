@@ -83,7 +83,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_STELLAR_RPC_URL` | Soroban RPC endpoint |
 | `NEXT_PUBLIC_STELLAR_HORIZON_URL` | Horizon REST API |
 | `NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE` | Stellar network passphrase |
-| `NEXT_PUBLIC_PINATA_JWT` | Pinata API JWT (from app.pinata.cloud) |
+| `PINATA_JWT` | Pinata API JWT (server-side only; never expose publicly) |
 | `NEXT_PUBLIC_PINATA_GATEWAY` | Pinata IPFS gateway URL |
 
 ## Install & Run
@@ -116,7 +116,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Sign up at [app.pinata.cloud](https://app.pinata.cloud)
 2. Go to **API Keys → New Key**, select **Admin** scope
-3. Copy the JWT into `.env.local` as `NEXT_PUBLIC_PINATA_JWT`
+3. Copy the JWT into `.env.local` as `PINATA_JWT`
+
+The app uploads to Pinata through internal API routes (`/api/ipfs/upload-image`, `/api/ipfs/upload-metadata`) so the JWT stays server-side.
 
 ## Artist Flow
 
@@ -155,5 +157,6 @@ npm run build
 npm run start
 ```
 
-Or deploy to [Vercel](https://vercel.com) — connect the repo and set all
-`NEXT_PUBLIC_*` environment variables in the Vercel project settings.
+Or deploy to [Vercel](https://vercel.com) — connect the repo and set required
+environment variables in project settings (`NEXT_PUBLIC_*` for public config,
+`PINATA_JWT` as a private server variable).
