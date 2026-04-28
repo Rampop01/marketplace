@@ -17,12 +17,19 @@ jest.mock('next/link', () => ({
   ),
 }));
 
-// Next.js Image — render as a plain <img> with valid alt handling
+// Next.js Image — render as a plain <img>, stripping Next-only props that
+// are not valid DOM attributes (fill, unoptimized, priority, sizes, quality).
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean }) => {
-    // Remove non-standard props and ensure alt is always present
-    const { fill: _fill, alt, ...rest } = props;
+  default: (
+    props: React.ImgHTMLAttributes<HTMLImageElement> & {
+      fill?: boolean;
+      unoptimized?: boolean;
+      priority?: boolean;
+      quality?: number;
+    }
+  ) => {
+    const { fill: _fill, unoptimized: _unoptimized, priority: _priority, quality: _quality, alt, ...rest } = props;
     return <img alt={alt || ''} {...rest} />;
   },
 }));
@@ -209,5 +216,37 @@ describe('ListingCard', () => {
     await waitFor(() => {
       expect(screen.getByText('Artwork #99')).toBeInTheDocument();
     });
+  });
+});
+
+// ── Image mock regression (#105) ──────────────────────────────────────────────
+
+describe('next/image mock', () => {
+  const NextImage = jest.requireMock('next/image').default as React.FC<Record<string, unknown>>;
+
+  it('does not forward unoptimized to the DOM element', () => {
+    const { container } = render(
+      <NextImage src="/test.png" alt="test" unoptimized width={100} height={100} />
+    );
+    const img = container.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img!.hasAttribute('unoptimized')).toBe(false);
+  });
+
+  it('does not forward fill to the DOM element', () => {
+    const { container } = render(
+      <NextImage src="/test.png" alt="test" fill />
+    );
+    const img = container.querySelector('img');
+    expect(img!.hasAttribute('fill')).toBe(false);
+  });
+
+  it('preserves alt and src attributes', () => {
+    const { container } = render(
+      <NextImage src="/test.png" alt="my image" unoptimized width={80} height={80} />
+    );
+    const img = container.querySelector('img');
+    expect(img!.getAttribute('alt')).toBe('my image');
+    expect(img!.getAttribute('src')).toBe('/test.png');
   });
 });
